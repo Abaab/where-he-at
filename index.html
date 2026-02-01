@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Where He At</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #map { height: 100%; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/h3-js@4.1.0/dist/h3-js.umd.js"></script>
+  <script>
+    const GIST_URL = 'https://gist.githubusercontent.com/Abaab/33030e7d70b5d5ba4e64aa440c771e6a/raw/data.txt';
+
+    // Qualitative color palette
+    const COLORS = [
+      '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+      '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
+      '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000'
+    ];
+
+    function hashToColor(hash) {
+      let sum = 0;
+      for (let i = 0; i < hash.length; i++) sum += hash.charCodeAt(i);
+      return COLORS[sum % COLORS.length];
+    }
+
+    async function init() {
+      const map = L.map('map').setView([0, 0], 2);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+      }).addTo(map);
+
+      const res = await fetch(GIST_URL);
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+
+      const cellUsers = new Map();
+      for (const line of lines) {
+        const [epoch, h3Cell, userHash] = line.split(' ');
+        if (!cellUsers.has(h3Cell)) cellUsers.set(h3Cell, new Set());
+        cellUsers.get(h3Cell).add(userHash);
+      }
+
+      const bounds = [];
+      for (const [h3Cell, users] of cellUsers) {
+        const boundary = h3.cellToBoundary(h3Cell);
+        const latLngs = boundary.map(([lat, lng]) => [lat, lng]);
+        bounds.push(...latLngs);
+
+        // Use first user's color for the cell
+        const color = hashToColor([...users][0]);
+        L.polygon(latLngs, {
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.5,
+          weight: 2
+        }).addTo(map).bindPopup(`Cell: ${h3Cell}<br>Users: ${[...users].join(', ')}`);
+      }
+
+      if (bounds.length) map.fitBounds(bounds);
+    }
+
+    init();
+  </script>
+</body>
+</html>
