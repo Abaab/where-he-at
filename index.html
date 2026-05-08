@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { height: 100%; width: 100%; }
+    html, body, #map { height: 100%; width: 100%; background: #1a1a2e; }
   </style>
 </head>
 <body>
@@ -19,9 +19,9 @@
 
     // Qualitative color palette
     const COLORS = [
-      '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
-      '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
-      '#008080', '#8b0000', '#9a6324', '#fffac8', '#800000'
+      '#8ae0e0', '#b88ace', '#f5e88a', '#8a9de0', '#f5b88a',
+      '#8fcf8f', '#e88a9e', '#8ad6e8', '#e88ad6', '#c8f0f0',
+      '#bf7a7a', '#7ac4c4', '#c4a87a', '#f5eda0', '#7abfbf'
     ];
 
     function hashToColor(hash) {
@@ -32,7 +32,7 @@
 
     async function init() {
       const map = L.map('map').setView([0, 0], 2);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
       }).addTo(map);
 
@@ -70,12 +70,35 @@
 
         // Use first user's color for the cell
         const color = hashToColor([...users][0]);
-        const dates = cellDates.get(h3Cell)
-          .sort((a, b) => a - b)
-          .map(ts => new Date(ts).toLocaleDateString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric'
-          }));
-        const uniqueDates = [...new Set(dates)];
+        const dayTimestamps = [...new Set(
+          cellDates.get(h3Cell).map(ts => {
+            const d = new Date(ts);
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+          })
+        )].sort((a, b) => a - b);
+
+        const DAY = 86400000;
+        const ranges = [];
+        let start = dayTimestamps[0], end = start;
+        for (let i = 1; i < dayTimestamps.length; i++) {
+          if (dayTimestamps[i] - end <= DAY) {
+            end = dayTimestamps[i];
+          } else {
+            ranges.push([start, end]);
+            start = end = dayTimestamps[i];
+          }
+        }
+        ranges.push([start, end]);
+
+        const fmtOpts = { year: 'numeric', month: 'short', day: 'numeric' };
+        const fmtDay = { month: 'short', day: 'numeric' };
+        const uniqueDates = ranges.map(([s, e]) => {
+          const sd = new Date(s), ed = new Date(e);
+          if (s === e) return sd.toLocaleDateString('en-US', fmtOpts);
+          if (sd.getMonth() === ed.getMonth() && sd.getFullYear() === ed.getFullYear())
+            return `${sd.toLocaleDateString('en-US', fmtDay)} - ${ed.getDate()}, ${ed.getFullYear()}`;
+          return `${sd.toLocaleDateString('en-US', fmtOpts)} - ${ed.toLocaleDateString('en-US', fmtOpts)}`;
+        });
 
         L.polygon(latLngs, {
           color: color,
@@ -88,7 +111,7 @@
       }
 
       if (trail.length > 1) {
-        L.polyline(trail, { color: '#333', weight: 2, opacity: 0.15 }).addTo(map);
+        L.polyline(trail, { color: '#ccc', weight: 2, opacity: 0.15 }).addTo(map);
       }
 
       if (latestCell) {
