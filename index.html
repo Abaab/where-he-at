@@ -41,6 +41,7 @@
       const lines = text.trim().split('\n');
 
       const cellUsers = new Map();
+      const cellDates = new Map();
       const trail = [];
       for (const line of lines) {
         const parts = line.split(' ');
@@ -49,6 +50,8 @@
         if (!h3.isValidCell(h3Cell)) continue;
         if (!cellUsers.has(h3Cell)) cellUsers.set(h3Cell, new Set());
         cellUsers.get(h3Cell).add(userHash);
+        if (!cellDates.has(h3Cell)) cellDates.set(h3Cell, []);
+        cellDates.get(h3Cell).push(Number(epoch));
         trail.push(h3.cellToLatLng(h3Cell));
       }
 
@@ -60,12 +63,21 @@
 
         // Use first user's color for the cell
         const color = hashToColor([...users][0]);
+        const dates = cellDates.get(h3Cell)
+          .sort((a, b) => a - b)
+          .map(ts => new Date(ts).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric'
+          }));
+        const uniqueDates = [...new Set(dates)];
+
         L.polygon(latLngs, {
           color: color,
           fillColor: color,
           fillOpacity: 0.6,
           weight: 3
-        }).addTo(map).bindPopup(`Cell: ${h3Cell}<br>Users: ${[...users].join(', ')}`);
+        }).addTo(map)
+          .bindTooltip(uniqueDates.join('<br>'), { sticky: true })
+          .bindPopup(`Cell: ${h3Cell}<br>Users: ${[...users].join(', ')}`);
       }
 
       if (trail.length > 1) {
