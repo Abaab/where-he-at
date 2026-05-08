@@ -43,16 +43,23 @@
       const cellUsers = new Map();
       const cellDates = new Map();
       const trail = [];
+      let latestEpoch = -Infinity;
+      let latestCell = null;
       for (const line of lines) {
         const parts = line.split(' ');
         if (parts.length !== 3) continue;
         const [epoch, h3Cell, userHash] = parts;
         if (!h3.isValidCell(h3Cell)) continue;
+        const ts = Number(epoch);
         if (!cellUsers.has(h3Cell)) cellUsers.set(h3Cell, new Set());
         cellUsers.get(h3Cell).add(userHash);
         if (!cellDates.has(h3Cell)) cellDates.set(h3Cell, []);
-        cellDates.get(h3Cell).push(Number(epoch));
+        cellDates.get(h3Cell).push(ts);
         trail.push(h3.cellToLatLng(h3Cell));
+        if (ts > latestEpoch) {
+          latestEpoch = ts;
+          latestCell = h3Cell;
+        }
       }
 
       const bounds = [];
@@ -84,7 +91,12 @@
         L.polyline(trail, { color: '#333', weight: 2, opacity: 0.15 }).addTo(map);
       }
 
-      if (bounds.length) map.fitBounds(bounds);
+      if (latestCell) {
+        const latestBoundary = h3.cellToBoundary(latestCell);
+        map.fitBounds(latestBoundary.map(([lat, lng]) => [lat, lng]));
+      } else if (bounds.length) {
+        map.fitBounds(bounds);
+      }
     }
 
     init();
